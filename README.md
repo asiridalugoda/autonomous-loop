@@ -1,0 +1,143 @@
+# Autonomous Loop
+
+A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) **skill** for running long,
+unattended, multi-goal work — the kind where a human isn't approving each step. You describe
+the objective once; the loop decomposes it into verifiable goals, builds them one at a time
+with a maker/checker split, and keeps its own state on disk so any fresh session (or a nightly
+cron) can resume exactly where it left off.
+
+> **Trigger it** with phrases like *"keep working without me"*, *"run the loop"*,
+> *"grind through this backlog unattended"*, *"self-improving loop"*, or *"autonomous loop"* —
+> Claude Code loads the skill automatically. You can also invoke it directly as
+> `/autonomous-loop`.
+
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
+&nbsp;·&nbsp; Claude Code skill &nbsp;·&nbsp; v1.0.0
+
+---
+
+## Credit & inspiration
+
+This skill is a direct, practical application of **Addy Osmani's "loop engineering"**:
+
+> ### 📝 https://addyosmani.com/blog/loop-engineering/
+
+Everything here is an attempt to turn that essay's ideas into a repeatable harness. The four
+that do the heavy lifting:
+
+> **"You design the system that does it instead."** — don't do the task by hand; build the
+> machine that does the task, then let it run.
+>
+> **"The model forgets, the repo doesn't."** — externalize all state to files on disk, so any
+> fresh session resumes with zero lost context.
+>
+> **"Split the one who writes from the one who checks."** — the agent that implements a goal
+> never grades it. A separate agent verifies. Maker ≠ checker.
+>
+> **"Verification is still on you."** — autonomy multiplies output, *including mistakes*. The
+> guardrails are what keep it from confidently amplifying drift.
+
+Please read the original post — it's the "why" behind every design choice in this skill.
+
+---
+
+## Install
+
+The skill is this repository. Drop it into your Claude Code skills directory.
+
+**Personal (all your projects):**
+
+```sh
+git clone https://github.com/asiridalugoda/autonomous-loop.git \
+  ~/.claude/skills/autonomous-loop
+```
+
+**A single project (checked in for your team):**
+
+```sh
+git clone https://github.com/asiridalugoda/autonomous-loop.git \
+  /path/to/your-project/.claude/skills/autonomous-loop
+```
+
+Prefer not to clone? Download the ZIP and copy the folder so that
+`~/.claude/skills/autonomous-loop/SKILL.md` exists. The extra files (`README.md`, `LICENSE`,
+`NOTICE`) are harmless — Claude Code only needs `SKILL.md` and `references/`.
+
+Restart Claude Code (or start a new session) and it will pick the skill up.
+
+**Requires:** Claude Code with skills enabled. The loop leans on Claude Code features —
+subagents for the checker panel, git worktrees for isolated parallel makers, and optionally
+Workflow scripts / scheduled wake-ups for unattended runs.
+
+---
+
+## How it works
+
+All state lives in a **spine** — a few plain Markdown files (ideally under `docs/loop/`) that
+hold everything the loop needs. A fresh session resumes by reading them in order and nothing
+else:
+
+| File | Holds |
+|---|---|
+| `LOOP.md` | The runbook: roles, the iteration sequence, guardrails, stopping conditions. |
+| `GOALS.md` | The dependency-ordered goal ladder — each goal with a checkable acceptance criterion. |
+| `BOARD.md` | Live state of every goal: open / in-progress / done / blocked, with notes. |
+| `handover.md` | 2–3 plain-English lines per merged goal, plus any current failure + next hypothesis. |
+| `audits/<date>-<goal>.md` | Evidence artifacts for security-critical changes. |
+
+Ready-to-fill templates for all of these are in
+[`references/spine-templates.md`](./references/spine-templates.md).
+
+### One iteration, per goal
+
+```
+1. LOAD SPINE   → read project instructions, handover.md, BOARD.md, GOALS.md.
+2. PICK GOAL    → the next unblocked goal in dependency order; mark it in-progress.
+3. TDD (red)    → write the failing test that encodes this goal's acceptance criterion.
+4. IMPLEMENT    → code until green; the boring, obvious solution; touch only what's needed.
+5. REVIEW       → an independent checker panel (maker ≠ checker). Red-team on security goals.
+6. VERIFY       → a fresh verifier checks the stopping condition against evidence.
+7a. PASS        → mark done, append "what changed & why" to handover.md, commit, advance.
+7b. FAIL        → record the failure + next hypothesis so the next pass self-unblocks.
+8. REPEAT       → until the slice / definition-of-done is met.
+```
+
+Independent goals can **fan out** to multiple maker agents at once, each in its own git
+worktree so their edits don't collide.
+
+### Running it unattended
+
+- **Interactive-autonomous** — one long session that keeps looping through goals until the
+  definition-of-done or an escalation.
+- **Scheduled** — a nightly cron / wake-up that triages (failing tests, lint, coverage gaps,
+  TODOs → new goals) and runs a bounded batch. This is the "self-improving" mode.
+- **Resume** — any new session continues from the spine files, in order.
+
+---
+
+## Safety — read this before you let it run
+
+Autonomy multiplies output, including mistakes. This skill has guardrails built in, but you
+own the outcome:
+
+- **Maker ≠ checker on every goal.** The agent that writes code never grades it. This is the
+  core error-correction; don't collapse the two.
+- **Security-critical invariants** (auth, tenant isolation, RBAC, money, safety gates,
+  destructive migrations) require the full reviewer panel **+** a red-team **+** a written
+  audit artifact before they change.
+- **Confirm the irreversible.** Autonomy over *building* is not autonomy over *shipping*.
+  Pushing, merging, deploying, and deleting happen only when you've authorized that class of
+  action.
+- **No silent caps & a comprehension-debt guard.** Skipped coverage is logged, not hidden;
+  every merged goal must be explainable in plain English or it's a stop signal.
+
+---
+
+## License & attribution
+
+Licensed under the **Apache License 2.0** — see [`LICENSE`](./LICENSE).
+
+Authored by **Siri Dalugoda** &lt;asiri.dalugoda@gmail.com&gt;. If you redistribute or adapt
+this skill, please keep the [`NOTICE`](./NOTICE) file and the attribution block at the bottom
+of `SKILL.md` (Apache-2.0 §4). Concepts credited to Addy Osmani's
+[loop engineering](https://addyosmani.com/blog/loop-engineering/).
