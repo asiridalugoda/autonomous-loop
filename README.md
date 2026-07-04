@@ -60,8 +60,8 @@ git clone https://github.com/asiridalugoda/autonomous-loop.git \
 ```
 
 Prefer not to clone? Download the ZIP and copy the folder so that
-`~/.claude/skills/autonomous-loop/SKILL.md` exists. The extra files (`README.md`, `LICENSE`,
-`NOTICE`) are harmless — Claude Code only needs `SKILL.md` and `references/`.
+`~/.claude/skills/autonomous-loop/SKILL.md` exists. The extra files (`README.md`, `LICENSE`)
+are harmless — Claude Code only needs `SKILL.md` and `references/`.
 
 Restart Claude Code (or start a new session) and it will pick the skill up.
 
@@ -133,11 +133,6 @@ own the outcome:
 
 ---
 
-## License & attribution
+## License
 
 Licensed under the **Apache License 2.0** — see [`LICENSE`](./LICENSE).
-
-Authored by **Siri Dalugoda** &lt;asiri.dalugoda@gmail.com&gt;. If you redistribute or adapt
-this skill, please keep the [`NOTICE`](./NOTICE) file and the attribution block at the bottom
-of `SKILL.md` (Apache-2.0 §4). Concepts credited to Addy Osmani's
-[loop engineering](https://addyosmani.com/blog/loop-engineering/).

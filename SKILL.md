@@ -10,7 +10,6 @@ description: >-
   "autonomous loop", "keep working without me", "no human intervention", "loop engineering",
   "self-improving loop", "run the loop", or "ralph loop" — even if they don't say "skill".
 license: Apache-2.0
-author: Siri Dalugoda <asiri.dalugoda@gmail.com>
 version: 1.0.0
 ---
 
@@ -196,11 +195,3 @@ or when you want the exact structure of a spine file.
 
 A proven real-world instance of this system lives in the Hardhat project under `docs/loop/`
 — useful to look at for a worked example of the spine files fully populated.
-
----
-
-<!-- Provenance — please keep this block, the LICENSE, and the NOTICE file when redistributing. -->
-**Authored by Siri Dalugoda** &lt;asiri.dalugoda@gmail.com&gt; · v1.0.0
-Copyright 2026 Siri Dalugoda. Licensed under the Apache License, Version 2.0 — see `LICENSE`.
-Under Apache-2.0 §4, retain this attribution and the `NOTICE` file in any copy or derivative.
-Canonical source & updates: https://github.com/asiridalugoda/autonomous-loop
