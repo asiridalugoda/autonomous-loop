@@ -2,9 +2,11 @@
 
 A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) **skill** for running long,
 unattended, multi-goal work — the kind where a human isn't approving each step. You describe
-the objective once; the loop decomposes it into verifiable goals, builds them one at a time
-with a maker/checker split, and keeps its own state on disk so any fresh session (or a nightly
-cron) can resume exactly where it left off.
+the objective once; the loop decomposes it into verifiable goals and builds them one at a time
+with a maker/checker split, keeping all its state on disk so any fresh session can resume
+exactly where it left off. It drives both feature work (test-driven goals) and open-ended
+optimization (metric-driven, keep-or-revert), and it rides through API/usage-limit
+interruptions by scheduling its own resume instead of dying.
 
 > **Trigger it** with phrases like *"keep working without me"*, *"run the loop"*,
 > *"grind through this backlog unattended"*, *"self-improving loop"*, or *"autonomous loop"* —
@@ -13,6 +15,22 @@ cron) can resume exactly where it left off.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
 &nbsp;·&nbsp; Claude Code skill &nbsp;·&nbsp; v1.2.1
+
+---
+
+## What it does
+
+- **Externalized spine** — all state (goals, board, handover, audits) lives in plain files on
+  disk, so any fresh session resumes with zero lost context.
+- **Maker ≠ checker** — the agent that implements a goal never grades it; an independent panel
+  (plus a red-team + audit on security-critical changes) signs off before it's done.
+- **Two goal shapes** — binary spec goals (TDD red→green) *and* metric-driven optimization
+  goals (baseline → change in a worktree → keep-or-revert), logged to `EXPERIMENTS.md`.
+- **Interruption-resilient** — a rate/usage-limit hit is a pause, not a failure: the loop
+  schedules a one-shot, state-checking resume (push, don't merge) and picks up the same step.
+- **Guarded self-revision** — the loop sharpens its own "what works here" heuristics over time,
+  but can never weaken a guardrail or security invariant.
+- **Unattended modes** — one long session, a nightly self-improving cron, or resume-from-spine.
 
 ---
 
