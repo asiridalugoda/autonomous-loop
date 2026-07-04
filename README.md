@@ -12,7 +12,7 @@ cron) can resume exactly where it left off.
 > `/autonomous-loop`.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
-&nbsp;·&nbsp; Claude Code skill &nbsp;·&nbsp; v1.2.0
+&nbsp;·&nbsp; Claude Code skill &nbsp;·&nbsp; v1.2.1
 
 ---
 
@@ -146,11 +146,13 @@ breaking something.
 - **Resume** — any new session continues from the spine files, in order.
 
 **Interruptions don't kill the run.** A rate/usage-limit hit, an overload (429/503/529), a
-timeout, or a crash is a *pause*, not a failure: the loop retries with backoff, or waits for
-the limit to reset — scheduling a wake-up if it's hours away — then resumes the same step from
-the spine. An open session rides straight through a limit; a killed one is picked up by the
-next session with zero lost work. (Interruptions never count toward the 3-strikes escalation —
-that's only for genuine task failures.)
+timeout, or a crash is a *pause*, not a failure — and it never counts toward the 3-strikes
+escalation. Transient blips get a retry with backoff. For a real usage-limit wall the loop
+**schedules a one-shot wake-up** (or cron) just past the reset, with a **state-first,
+idempotent prompt**: the wake-up reads the spine + git/PR state, does **nothing** if the run
+already finished and pushed cleanly, or **resumes the remaining steps** if it stalled — and it
+carries the same guardrails (e.g. push to the PR, but never merge). Either way the resume reads
+the spine and picks up the same step with zero lost work.
 
 Over repeated runs the loop also sharpens its own runbook: it appends evidence-backed
 heuristics to a **"What works here"** section of `LOOP.md` (e.g. "this suite is flaky under

@@ -58,8 +58,9 @@ panel signs off the release. Then STOP building.>
 ## Resume protocol
 New session reads, in order: project instructions → handover.md → BOARD.md → GOALS.md.
 Interruptions (rate/usage limit, 429/503/529, timeout, crash) are NOT failures: retry with
-backoff, or wait for the limit to reset / schedule a wake-up, then resume the same step — never
-count it toward the 3-strikes escalation.
+backoff, or schedule a one-shot state-checking wake-up past the limit reset (no-op if already
+done, resume if stalled; push but don't merge), then continue the same step — never count it
+toward the 3-strikes escalation.
 
 ## What works here (evidence-backed heuristics — the loop MAY append; it may NEVER edit the guardrails)
 - <e.g. integration tests must migrate the test DB before the parallel suite runs>

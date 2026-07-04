@@ -10,7 +10,7 @@ description: >-
   "autonomous loop", "keep working without me", "no human intervention", "loop engineering",
   "self-improving loop", "run the loop", or "ralph loop" — even if they don't say "skill".
 license: Apache-2.0
-version: 1.2.0
+version: 1.2.1
 ---
 
 # Autonomous Loop
@@ -208,11 +208,14 @@ state is on disk, so resuming is just reading it back.
   failures. Resume the same step; the goal is unchanged.
 - **Retry transient errors with backoff.** 429 / 503 / 529 / "overloaded" / network blips →
   exponential backoff and retry, not abort. Only a real, reproducible task error is a FAIL.
-- **On a usage/rate-limit wall, wait it out and continue.** If the reset window is short,
-  block until it clears and resume the same iteration — an open session keeps going *through*
-  the limit rather than dying at it. If the reset is hours away, **schedule a wake-up / cron**
-  to re-enter the loop when it clears (the Scheduled-mode resume path) instead of holding a
-  session idle.
+- **On a usage/rate-limit wall, schedule a one-shot resume.** Set a wake-up (or cron) for just
+  past the reset window, with a **state-first, idempotent** prompt: it reads the spine + git/PR
+  state, **no-ops** if the run already finished and pushed cleanly, and **resumes the remaining
+  steps** if it stalled (e.g. *reconcile findings → re-run stragglers → full audit → green gate
+  → push to the PR → post the closure summary*). Because it checks state before acting, firing
+  it with nothing to do is harmless — no double-work. It inherits every guardrail, notably
+  **push, but do not merge** — autonomy over building isn't autonomy over shipping. A one-shot,
+  state-checking wake-up beats holding a session open idle or blindly re-running.
 - **Checkpoint before anything long.** Keep `handover.md` + `BOARD.md` current *before* a long
   build/test/deploy, and commit at each PASS. Worst case an interruption costs the current
   in-flight step — never merged work — and the next pass reads the spine and picks up exactly
@@ -221,9 +224,9 @@ state is on disk, so resuming is just reading it back.
   is re-derived from the spine + git state, not double-applied. Because each goal is gated by
   its own test, a re-run converges rather than duplicates.
 
-The rule of thumb: **the session may pause, but the run doesn't die.** A live loop rides
-through a limit hit; a killed one is resumed from the spine by the next session — either way,
-zero lost context.
+The rule of thumb: **the session may pause, but the run doesn't die.** Whether the harness
+waits out the limit or a scheduled one-shot wake-up re-enters, the resume reads the spine and
+picks up the same step — either way, zero lost context.
 
 ## Stopping conditions
 
