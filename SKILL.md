@@ -10,7 +10,7 @@ description: >-
   "autonomous loop", "keep working without me", "no human intervention", "loop engineering",
   "self-improving loop", "run the loop", or "ralph loop" — even if they don't say "skill".
 license: Apache-2.0
-version: 1.1.0
+version: 1.2.0
 ---
 
 # Autonomous Loop
@@ -196,6 +196,35 @@ But don't thrash: after **3** failed passes on the same goal, **escalate** — n
 user with the specific blocker and park the goal (mark it blocked on `BOARD.md`), then move
 to the next unblocked goal rather than looping on the wall.
 
+## Surviving interruptions (API limits, rate limits, crashes)
+
+A long unattended run *will* get interrupted — a usage/rate limit, a 429/503/529 overload, a
+timeout, a dropped connection, a context compaction. **None of these are goal failures, and
+none should stop the run.** The spine is exactly what makes an interruption a non-event: the
+state is on disk, so resuming is just reading it back.
+
+- **An interruption is not a `FAIL`.** A limit/timeout/crash must **not** burn a self-unblock
+  attempt or count toward the 3-strikes escalation — that counter is for genuine *task*
+  failures. Resume the same step; the goal is unchanged.
+- **Retry transient errors with backoff.** 429 / 503 / 529 / "overloaded" / network blips →
+  exponential backoff and retry, not abort. Only a real, reproducible task error is a FAIL.
+- **On a usage/rate-limit wall, wait it out and continue.** If the reset window is short,
+  block until it clears and resume the same iteration — an open session keeps going *through*
+  the limit rather than dying at it. If the reset is hours away, **schedule a wake-up / cron**
+  to re-enter the loop when it clears (the Scheduled-mode resume path) instead of holding a
+  session idle.
+- **Checkpoint before anything long.** Keep `handover.md` + `BOARD.md` current *before* a long
+  build/test/deploy, and commit at each PASS. Worst case an interruption costs the current
+  in-flight step — never merged work — and the next pass reads the spine and picks up exactly
+  where it stopped.
+- **Resume is idempotent.** Re-entering an interrupted iteration must be safe: a half-done goal
+  is re-derived from the spine + git state, not double-applied. Because each goal is gated by
+  its own test, a re-run converges rather than duplicates.
+
+The rule of thumb: **the session may pause, but the run doesn't die.** A live loop rides
+through a limit hit; a killed one is resumed from the spine by the next session — either way,
+zero lost context.
+
 ## Stopping conditions
 
 Each goal stops when its AC holds (tests green + gates clean + panel approved + relevant
@@ -209,8 +238,9 @@ over-building past the agreed surface is itself a regression against the goal.
 Three modes, depending on how hands-off the user wants to be:
 
 - **Interactive-autonomous** — one long session: keep looping through goals, updating the
-  spine each iteration, until DoD or an escalation. Context compaction is fine; the spine is
-  what carries state across it.
+  spine each iteration, until DoD or an escalation. Context compaction is fine, and so is a
+  rate/usage-limit hit — the run pauses and resumes rather than dying (see *Surviving
+  interruptions*); the spine is what carries state across either.
 - **Scheduled** — a nightly/periodic cron (or a scheduled wake-up) that runs a bounded batch
   of iterations: triage (scan for failing/flaky tests, lint, coverage gaps, TODOs, open UAT
   findings → enqueue as goals on `BOARD.md`), then run the loop until a budget/stop. This is

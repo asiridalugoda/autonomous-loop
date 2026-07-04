@@ -12,7 +12,7 @@ cron) can resume exactly where it left off.
 > `/autonomous-loop`.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
-&nbsp;·&nbsp; Claude Code skill &nbsp;·&nbsp; v1.1.0
+&nbsp;·&nbsp; Claude Code skill &nbsp;·&nbsp; v1.2.0
 
 ---
 
@@ -144,6 +144,13 @@ breaking something.
 - **Scheduled** — a nightly cron / wake-up that triages (failing tests, lint, coverage gaps,
   TODOs → new goals) and runs a bounded batch. This is the "self-improving" mode.
 - **Resume** — any new session continues from the spine files, in order.
+
+**Interruptions don't kill the run.** A rate/usage-limit hit, an overload (429/503/529), a
+timeout, or a crash is a *pause*, not a failure: the loop retries with backoff, or waits for
+the limit to reset — scheduling a wake-up if it's hours away — then resumes the same step from
+the spine. An open session rides straight through a limit; a killed one is picked up by the
+next session with zero lost work. (Interruptions never count toward the 3-strikes escalation —
+that's only for genuine task failures.)
 
 Over repeated runs the loop also sharpens its own runbook: it appends evidence-backed
 heuristics to a **"What works here"** section of `LOOP.md` (e.g. "this suite is flaky under
