@@ -18,9 +18,12 @@ cron) can resume exactly where it left off.
 
 ## Credit & inspiration
 
-This skill is a direct, practical application of **Addy Osmani's "loop engineering"**:
+This skill is a direct, practical application of **[Addy Osmani](https://github.com/addyosmani)'s
+"loop engineering"**:
 
 > ### 📝 https://addyosmani.com/blog/loop-engineering/
+>
+> 👤 GitHub: [@addyosmani](https://github.com/addyosmani)
 
 Everything here is an attempt to turn that essay's ideas into a repeatable harness. The four
 that do the heavy lifting:
