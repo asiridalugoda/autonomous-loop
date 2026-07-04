@@ -1,6 +1,6 @@
 # Spine templates
 
-Fill-in scaffolds for the five files the autonomous loop runs on. Copy each into the
+Fill-in scaffolds for the spine files the autonomous loop runs on. Copy each into the
 project's `docs/loop/` (or `loop/`) directory during Step 0 bootstrap, replace the
 `<angle-bracket>` placeholders, delete the guidance comments, and commit. Keep them lean —
 they're read every iteration; bloat costs context on every pass.
@@ -57,6 +57,10 @@ panel signs off the release. Then STOP building.>
 
 ## Resume protocol
 New session reads, in order: project instructions → handover.md → BOARD.md → GOALS.md.
+
+## What works here (evidence-backed heuristics — the loop MAY append; it may NEVER edit the guardrails)
+- <e.g. integration tests must migrate the test DB before the parallel suite runs>
+- <e.g. this suite is flaky under parallelism → confirm green with --no-file-parallelism>
 ```
 
 ---
@@ -76,6 +80,8 @@ explicit acceptance criterion. The AC *is* the test.
       Depends on: <none | G<N>.x>.
 - [ ] **G<N>.2 <goal title>** — <intent>. **AC:** <...>. Depends on: G<N>.1.
       🔒 security-critical → strict panel + red-team + audit artifact.
+- [ ] **G<N>.3 <optimization goal>** — <intent>. 📈 **metric AC:** <one metric + direction +
+      threshold, e.g. "p95 latency ↓ ≥10% vs baseline">, measured with `<command>`; keep-or-revert.
 - [ ] ...
 
 ### Slice <N> /goal (stop condition)
@@ -83,7 +89,9 @@ explicit acceptance criterion. The AC *is* the test.
 ```
 
 Convention: `[ ]` open, `[x]` done. Mark `🔒` on goals that touch a security-critical area
-so the loop knows to escalate the review automatically.
+so the loop knows to escalate the review automatically. Mark `📈` on optimization goals — the
+loop runs those as metric-driven keep-or-revert experiments (logged to `EXPERIMENTS.md`), not
+binary tests.
 
 ---
 
@@ -155,3 +163,27 @@ escalation, auth bypass, gate circumvention, data-loss on a destructive migratio
 ## Verdict
 <GO / NO-GO, who confirmed (majority-must-confirm for security), residual risk, follow-ups>
 ```
+
+---
+
+## `EXPERIMENTS.md` — the keep-or-revert ledger (optimization goals only)
+
+Append-only record for metric-driven goals, so a discarded experiment is never re-run. Read
+it before proposing a new experiment; newest on top. Keep it committed if you want the
+anti-repeat memory to survive a fresh clone.
+
+```markdown
+# Experiments — <metric name> (<direction, e.g. lower is better>)
+
+Baseline: <value> @ `<sha>` — measured with `<command>` under <fixed budget, e.g. 5-min wall / 50k tok>.
+
+| # | idea | result | Δ vs baseline | verdict | why |
+|---|------|--------|---------------|---------|-----|
+| 3 | <what was changed> | <value> | -8% | ✅ kept (`<sha>`) | <one line> |
+| 2 | <...> | <value> | +2% | ↩️ reverted | worse — discarded the worktree |
+| 1 | <...> | <value> | 0% | ↩️ reverted | no movement |
+```
+
+Rules: **never re-run a reverted idea** — dedup a new proposal against this table first. And
+verify metrics maker ≠ checker — the checker re-measures from the baseline, never takes the
+maker's number on faith.

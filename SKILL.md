@@ -10,7 +10,7 @@ description: >-
   "autonomous loop", "keep working without me", "no human intervention", "loop engineering",
   "self-improving loop", "run the loop", or "ralph loop" — even if they don't say "skill".
 license: Apache-2.0
-version: 1.0.0
+version: 1.1.0
 ---
 
 # Autonomous Loop
@@ -55,9 +55,11 @@ reading them in order and nothing else:
 | `BOARD.md` | Live state of every goal: open / in-progress / done / blocked, with notes | The at-a-glance current position; where triage enqueues new work |
 | `handover.md` | The narrative spine: 2–3 plain-English lines per merged goal ("what changed and why"), plus any current failure + next hypothesis | Comprehension debt guard; the self-unblock memory |
 | `audits/<date>-<goal>.md` | Evidence artifacts for security-critical changes | What was attacked, the evidence, the verdict — a durable record |
+| `EXPERIMENTS.md` | The keep-or-revert ledger for optimization goals: idea → metric delta → kept/reverted | Anti-repeat memory, so a discarded experiment is never re-run |
 
-If these don't exist yet, **bootstrap them first** (Step 0). If they do, you're resuming —
-read them and continue.
+`audits/` and `EXPERIMENTS.md` are written only when a goal needs them (a security-critical
+change, or an optimization goal); the other four are the always-on core. If the spine doesn't
+exist yet, **bootstrap it first** (Step 0). If it does, you're resuming — read it and continue.
 
 ## Step 0 — Bootstrap (only if the spine is missing)
 
@@ -111,6 +113,34 @@ where a later goal genuinely needs all prior results (e.g. dedupe a matrix befor
 on it). For heavy fan-out with deterministic control flow, a Workflow script is the right
 tool; for a handful, parallel subagents are simpler.
 
+## Optimization goals (metric-driven, keep-or-revert)
+
+Not every goal has a binary pass/fail AC. "Make it faster / smaller / cheaper / less flaky"
+is open-ended optimization, where success is a **metric moving in a direction**, not a test
+flipping green. Karpathy's autoresearch (`https://github.com/karpathy/autoresearch`) is built
+for exactly this shape, and its discipline ports cleanly: for these goals, swap steps 3–7 of
+the iteration for a hill-climb.
+
+- **AC = metric + direction + threshold**, not a test — e.g. "p95 latency ↓ ≥10%",
+  "bundle ↓", "flaky-rate → 0%". Pick **one** primary metric per goal so better/worse is
+  unambiguous; name it and how to measure it in `GOALS.md`.
+- **Baseline first.** Measure the metric on the current commit and record it before touching
+  anything. Fix the measurement — same command, same **fixed budget** (a wall-clock or token
+  cap) so runs are comparable, the way autoresearch fixes a 5-minute budget per trial.
+- **Experiment in a throwaway worktree.** Make the change in an isolated worktree; the
+  worktree *is* the revert mechanism.
+- **Keep-or-revert.** Re-measure. Improved past threshold → keep the commit (advance).
+  Equal or worse → discard the worktree, revert. This is autoresearch's git advance/reset.
+- **Log every attempt to `EXPERIMENTS.md`** — idea, baseline→result delta, kept/reverted,
+  one line why — append-only. Before proposing a new experiment, read it: **never re-run a
+  discarded idea.** This is where the loop beats autoresearch, which records results but has
+  no anti-repeat rule — reuse the "dedup against what's already been seen" discipline.
+
+Maker ≠ checker still holds: a metric the maker reports is verified by the checker
+**re-measuring from the baseline**, never taken on faith. And guard the metric itself — a
+change that improves the number by breaking a correctness test is a regression, not an
+improvement. The binary suites stay green *and* the metric moves.
+
 ## Roles (keep them separate)
 
 - **Maker / implementer** — picks the goal, writes the failing tests, implements to green.
@@ -156,6 +186,12 @@ clause. A review that didn't actually read the code isn't a review.
 
 A failed goal isn't a stop — it's data. Write the failure and your next hypothesis to
 `handover.md`; the next pass reads it and retries with that context, no human re-prompt.
+
+**Rewind before you escalate.** If two passes in a row fail by *building on* a broken
+attempt, stop patching the doomed path — `git reset` to the last known-good baseline (the
+commit before the goal started) and retry from a genuinely different angle. It's cheap, and
+it's autoresearch's "if you're stuck, rewind" rather than piling fixes on top of fixes.
+
 But don't thrash: after **3** failed passes on the same goal, **escalate** — notify the
 user with the specific blocker and park the goal (mark it blocked on `BOARD.md`), then move
 to the next unblocked goal rather than looping on the wall.
@@ -187,11 +223,32 @@ Three modes, depending on how hands-off the user wants to be:
 Whichever mode: **update `handover.md` + `BOARD.md` before you stop.** The model forgets;
 the repo doesn't.
 
+## Evolving the runbook (guarded self-revision)
+
+The loop can improve its own *method*, not just the product — autoresearch's `program.md` is
+itself editable by the agent. Give `LOOP.md` a **"What works here"** section and let the loop
+append to it when it discovers a repeatable, evidence-backed pattern ("integration tests must
+migrate the test DB first"; "this suite is flaky under parallelism — run it
+`--no-file-parallelism`"). Over nights the runbook sharpens, and later passes inherit the
+lesson instead of re-learning it.
+
+This is the one place self-modification is allowed, and it is **fenced**:
+
+- **Additive to heuristics only.** The loop may add or refine entries under "What works here."
+  It may **not** touch the guardrails, the maker ≠ checker rule, the security-critical list,
+  or any stopping condition.
+- **Guardrails and security invariants are immutable to the loop.** Weakening one takes the
+  full panel **+** red-team **+** an audit artifact **+** a human — never a self-edit. The
+  same rule that protects security-critical *code* protects the *runbook clauses* that guard
+  it.
+- **Evidence, not vibes.** A new heuristic cites the concrete pass/failure that taught it and
+  goes through the checker like any other change. A rule the loop can't justify isn't written.
+
 ## Reference
 
 `references/spine-templates.md` — fill-in templates for `LOOP.md`, `GOALS.md`, `BOARD.md`,
-`handover.md`, and an `audits/` artifact. Read it when bootstrapping a new project (Step 0)
-or when you want the exact structure of a spine file.
+`handover.md`, the `audits/` artifact, and the `EXPERIMENTS.md` ledger. Read it when
+bootstrapping a new project (Step 0) or when you want the exact structure of a spine file.
 
 A proven real-world instance of this system lives in the Hardhat project under `docs/loop/`
 — useful to look at for a worked example of the spine files fully populated.

@@ -12,7 +12,7 @@ cron) can resume exactly where it left off.
 > `/autonomous-loop`.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
-&nbsp;·&nbsp; Claude Code skill &nbsp;·&nbsp; v1.0.0
+&nbsp;·&nbsp; Claude Code skill &nbsp;·&nbsp; v1.1.0
 
 ---
 
@@ -107,6 +107,13 @@ Ready-to-fill templates for all of these are in
 
 Independent goals can **fan out** to multiple maker agents at once, each in its own git
 worktree so their edits don't collide.
+
+**Two goal shapes.** Most goals are *spec goals* — a binary pass/fail acceptance test
+(TDD red→green). For open-ended *optimization goals* ("make it faster / smaller / less
+flaky") the loop swaps in a metric-driven hill-climb: measure a baseline, change it in a
+throwaway worktree under a fixed budget, then **keep the commit if the metric improved or
+revert if not** — logging every attempt to `EXPERIMENTS.md` so a discarded idea is never
+re-run. That part borrows [Karpathy's autoresearch](https://github.com/karpathy/autoresearch).
 
 ### Running it unattended
 
