@@ -42,6 +42,12 @@ that do the heavy lifting:
 
 Please read the original post — it's the "why" behind every design choice in this skill.
 
+It also borrows from **[Andrej Karpathy](https://github.com/karpathy)'s
+[autoresearch](https://github.com/karpathy/autoresearch)**
+([@karpathy](https://github.com/karpathy)): the *optimization-goal* mode — one primary metric,
+a fixed per-trial budget, and keep-the-commit-or-`git reset` on the result — is that project's
+overnight experiment loop, adapted for build work.
+
 ---
 
 ## Install
@@ -87,6 +93,7 @@ else:
 | `BOARD.md` | Live state of every goal: open / in-progress / done / blocked, with notes. |
 | `handover.md` | 2–3 plain-English lines per merged goal, plus any current failure + next hypothesis. |
 | `audits/<date>-<goal>.md` | Evidence artifacts for security-critical changes. |
+| `EXPERIMENTS.md` | Keep-or-revert ledger for optimization goals (only appears when you run them). |
 
 Ready-to-fill templates for all of these are in
 [`references/spine-templates.md`](./references/spine-templates.md).
@@ -108,12 +115,27 @@ Ready-to-fill templates for all of these are in
 Independent goals can **fan out** to multiple maker agents at once, each in its own git
 worktree so their edits don't collide.
 
-**Two goal shapes.** Most goals are *spec goals* — a binary pass/fail acceptance test
-(TDD red→green). For open-ended *optimization goals* ("make it faster / smaller / less
-flaky") the loop swaps in a metric-driven hill-climb: measure a baseline, change it in a
-throwaway worktree under a fixed budget, then **keep the commit if the metric improved or
-revert if not** — logging every attempt to `EXPERIMENTS.md` so a discarded idea is never
-re-run. That part borrows [Karpathy's autoresearch](https://github.com/karpathy/autoresearch).
+### Two goal shapes
+
+Most goals are **spec goals** — a binary pass/fail acceptance test (TDD red→green), exactly as
+the iteration above describes.
+
+For open-ended **optimization goals** ("make it faster / smaller / less flaky") the loop runs a
+metric-driven hill-climb instead of a test: measure a baseline, make the change in a throwaway
+worktree under a fixed budget, then **keep the commit if the metric improved or revert if
+not** — logging every attempt to `EXPERIMENTS.md` so a discarded idea is never re-run. That
+discipline is borrowed from [Karpathy's autoresearch](https://github.com/karpathy/autoresearch).
+
+To use one, write the goal in `GOALS.md` with a `📈` metric AC instead of a test:
+
+```markdown
+- [ ] **G3.1 Speed up the dashboard query** — 📈 metric AC: p95 latency ↓ ≥10% vs baseline,
+      measured with `pnpm bench:dashboard`; keep-or-revert.
+```
+
+The loop records a baseline, tries changes one at a time, and keeps only those that move the
+number — with the correctness suites still required to stay green, so it can't "win" by
+breaking something.
 
 ### Running it unattended
 
@@ -122,6 +144,11 @@ re-run. That part borrows [Karpathy's autoresearch](https://github.com/karpathy/
 - **Scheduled** — a nightly cron / wake-up that triages (failing tests, lint, coverage gaps,
   TODOs → new goals) and runs a bounded batch. This is the "self-improving" mode.
 - **Resume** — any new session continues from the spine files, in order.
+
+Over repeated runs the loop also sharpens its own runbook: it appends evidence-backed
+heuristics to a **"What works here"** section of `LOOP.md` (e.g. "this suite is flaky under
+parallelism — run it single-threaded"). It may refine those notes, but it can **never** edit
+the guardrails or security invariants — those stay human-only.
 
 ---
 
