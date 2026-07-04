@@ -208,14 +208,23 @@ state is on disk, so resuming is just reading it back.
   failures. Resume the same step; the goal is unchanged.
 - **Retry transient errors with backoff.** 429 / 503 / 529 / "overloaded" / network blips →
   exponential backoff and retry, not abort. Only a real, reproducible task error is a FAIL.
-- **On a usage/rate-limit wall, schedule a one-shot resume.** Set a wake-up (or cron) for just
-  past the reset window, with a **state-first, idempotent** prompt: it reads the spine + git/PR
-  state, **no-ops** if the run already finished and pushed cleanly, and **resumes the remaining
+- **On a usage/rate-limit wall, actually schedule a one-shot resume — call the scheduler, don't
+  just say you will.** Describing a wake-up isn't setting one. Use the harness's scheduling
+  tool: in Claude Code, a one-shot **`CronCreate`** (`recurring: false`, pinned to a wall-clock
+  time just past the reset — it fires once, then auto-deletes), or **`ScheduleWakeup`** for an
+  in-session delay (≤ 1 h). Give it a **state-first, idempotent** prompt: read the spine +
+  git/PR state, **no-op** if the run already finished and pushed cleanly, **resume the remaining
   steps** if it stalled (e.g. *reconcile findings → re-run stragglers → full audit → green gate
   → push to the PR → post the closure summary*). Because it checks state before acting, firing
-  it with nothing to do is harmless — no double-work. It inherits every guardrail, notably
-  **push, but do not merge** — autonomy over building isn't autonomy over shipping. A one-shot,
-  state-checking wake-up beats holding a session open idle or blindly re-running.
+  it with nothing to do is harmless. It inherits every guardrail — notably **push, but do not
+  merge**; autonomy over building isn't autonomy over shipping.
+- **Know your scheduler's durability.** `CronCreate` / `ScheduleWakeup` are **session-only**
+  (in-memory): they fire while a rate-limited session is still alive and idle, but they're lost
+  if the session is *killed*. If a hard limit might kill the session, back the resume with a
+  **durable** trigger — a cloud routine (`/schedule`), an external cron, or a human re-launch —
+  that starts a *fresh* session on the same idempotent prompt. The spine on disk is the ultimate
+  backstop: any new session re-enters and resumes with zero lost work; automatic resume just
+  needs a durable trigger to pull it.
 - **Checkpoint before anything long.** Keep `handover.md` + `BOARD.md` current *before* a long
   build/test/deploy, and commit at each PASS. Worst case an interruption costs the current
   in-flight step — never merged work — and the next pass reads the spine and picks up exactly

@@ -148,11 +148,16 @@ breaking something.
 **Interruptions don't kill the run.** A rate/usage-limit hit, an overload (429/503/529), a
 timeout, or a crash is a *pause*, not a failure — and it never counts toward the 3-strikes
 escalation. Transient blips get a retry with backoff. For a real usage-limit wall the loop
-**schedules a one-shot wake-up** (or cron) just past the reset, with a **state-first,
-idempotent prompt**: the wake-up reads the spine + git/PR state, does **nothing** if the run
-already finished and pushed cleanly, or **resumes the remaining steps** if it stalled — and it
-carries the same guardrails (e.g. push to the PR, but never merge). Either way the resume reads
-the spine and picks up the same step with zero lost work.
+**actually schedules a one-shot wake-up** just past the reset — in Claude Code, a one-shot
+`CronCreate` (fires once, then auto-deletes) or `ScheduleWakeup` — with a **state-first,
+idempotent prompt**: it reads the spine + git/PR state, does **nothing** if the run already
+finished and pushed cleanly, or **resumes the remaining steps** if it stalled — carrying the
+same guardrails (e.g. push to the PR, but never merge).
+
+Those schedulers are session-only, so they cover a *paused* session. If a limit might **kill**
+the session, back the resume with a durable trigger — a `/schedule` cloud routine, an external
+cron, or a human re-launch — that starts a fresh session on the same prompt. Either way the
+spine on disk guarantees the resume picks up the same step with zero lost work.
 
 Over repeated runs the loop also sharpens its own runbook: it appends evidence-backed
 heuristics to a **"What works here"** section of `LOOP.md` (e.g. "this suite is flaky under
