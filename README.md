@@ -31,6 +31,10 @@ interruptions by scheduling its own resume instead of dying.
 - **Guarded self-revision** — the loop sharpens its own "what works here" heuristics over time,
   but can never weaken a guardrail or security invariant.
 - **Unattended modes** — one long session, a nightly self-improving cron, or resume-from-spine.
+- **Multi-agent coordinator** — on Anthropic's [Managed Agents API](https://platform.claude.com/docs/en/managed-agents/multi-agent),
+  run the roles as a persistent **coordinator + roster** (maker, code-reviewer, security-auditor,
+  red-team, verifier — one agent each), where maker ≠ checker is enforced by the *topology*, not
+  just discipline, and only the coordinator can ship.
 
 ---
 
@@ -132,6 +136,18 @@ Ready-to-fill templates for all of these are in
 
 Independent goals can **fan out** to multiple maker agents at once, each in its own git
 worktree so their edits don't collide.
+
+### Multi-agent coordinator
+
+On Anthropic's [Managed Agents API](https://platform.claude.com/docs/en/managed-agents/multi-agent)
+the roles become a persistent **coordinator + roster** instead of subagents you dispatch and
+discard. Each role is its own agent — a maker, a code-reviewer, a security-auditor, a red-team, a
+verifier — with its own model, prompt, and tools. The coordinator holds the spine and delegates;
+the maker *can't* grade its own work because the coordinator can't ask it to (maker ≠ checker
+becomes the topology); and only the coordinator carries push/merge/deploy, so a worker literally
+can't ship. The concrete wiring — roster map, create-coordinator snippet, thread observability,
+and the capability-boundary guardrail — is in
+[`references/multi-agent-coordinator.md`](./references/multi-agent-coordinator.md).
 
 ### Two goal shapes
 
