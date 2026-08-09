@@ -6,7 +6,9 @@ the objective once; the loop decomposes it into verifiable goals and builds them
 with a maker/checker split, keeping all its state on disk so any fresh session can resume
 exactly where it left off. It drives both feature work (test-driven goals) and open-ended
 optimization (metric-driven, keep-or-revert), and it rides through API/usage-limit
-interruptions by scheduling its own resume instead of dying.
+interruptions by scheduling its own resume instead of dying. With **Relay**, two or more
+Claude instances on different machines can run the same loop on the same repo and hand
+work to each other autonomously — no human copy-paste in between.
 
 > **Trigger it** with phrases like *"keep working without me"*, *"run the loop"*,
 > *"grind through this backlog unattended"*, *"self-improving loop"*, or *"autonomous loop"* —
@@ -14,7 +16,7 @@ interruptions by scheduling its own resume instead of dying.
 > `/autonomous-loop`.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
-&nbsp;·&nbsp; Claude Code skill &nbsp;·&nbsp; v1.2.1
+&nbsp;·&nbsp; Claude Code skill &nbsp;·&nbsp; v1.4.0
 
 ---
 
@@ -35,6 +37,9 @@ interruptions by scheduling its own resume instead of dying.
   run the roles as a persistent **coordinator + roster** (maker, code-reviewer, security-auditor,
   red-team, verifier — one agent each), where maker ≠ checker is enforced by the *topology*, not
   just discipline, and only the coordinator can ship.
+- **Relay (multi-node)** — say *"autonomous-loop relay"* and instances on different machines
+  (mac↔win, mac↔mac, win↔win) coordinate through the repo's own GitHub issues: a
+  controller directs, a worker executes on its box, labels pass the baton.
 
 ---
 
@@ -197,6 +202,63 @@ Over repeated runs the loop also sharpens its own runbook: it appends evidence-b
 heuristics to a **"What works here"** section of `LOOP.md` (e.g. "this suite is flaky under
 parallelism — run it single-threaded"). It may refine those notes, but it can **never** edit
 the guardrails or security invariants — those stay human-only.
+
+---
+
+## Relay — two Claudes, two machines, one loop
+
+Fixing something on a Windows box while driving the investigation from a Mac? Before
+Relay that meant a human copy-pasting between two sessions. Relay removes the human
+message bus: instances on different machines run this same loop **on the same repo**, and
+the repo is the only meeting point — mac↔win, mac↔mac, win↔win, all identical.
+
+**Setup** — in a clone of the target repo, say:
+
+```
+autonomous-loop relay
+```
+
+First run: a short wizard detects your remote and `gh` auth, warns if the repo is
+public, asks what may be delegated to remote workers, confirms — then creates the
+labels, writes a `## Relay` section into the master file (`docs/loop/LOOP.md`), and
+pushes. On every other machine it's just: clone the repo, say the same phrase — the
+master file teaches the new node everything.
+
+**How a job runs** — one GitHub issue per job, on the target repo itself:
+
+```
+issue #12  controller: mac-studio · worker: win-desktop
+────────────────────────────────────────────────────────
+mac   → TASK 1: "where vcruntime140.dll; run app.exe --verbose; capture err.log"
+        label → awaiting:worker
+win   → "claiming TASK 1" · label → working
+        executes, redacts, commits log to docs/loop/relay/12/logs/
+      → RESULT 1: dll present, crash persists — full log linked
+        label → awaiting:controller
+mac   → updates issue body + handover.md, dispatches TASK 2 …
+        … until a verification TASK passes on the worker → resolved, issue closed
+```
+
+The **controller** owns analysis, hypotheses, and authored fixes (for code jobs it
+pushes a fix branch; the task is "checkout, build, test, report"). The **worker**
+executes exactly as scoped on its own box and reports facts. Labels are the baton —
+only the holder acts, one task outstanding at a time, and the worker *claims* before
+executing so a duplicate watcher firing can never re-run a state-mutating task. Each
+node watches with its live session (`/loop`, ~1–2 min round-trips) plus an OS-scheduler
+backstop (launchd / Task Scheduler) firing a headless, idempotent watcher every ~5
+minutes — sessions can die, sleep, or reboot and the run continues.
+
+**Relay's own guardrails:** on public repos anyone can comment on your issues — so only
+comments from accounts registered in the node table count as instructions, and
+everything else (including instruction-shaped text inside captured logs) is data. Logs
+are redacted before they're committed. Destructive operations need an explicit
+human-authorized marker in the task. Three failed round-trips on one hypothesis
+escalates to a `needs:human` label instead of thrashing.
+
+Templates (wizard, master-file section, comment formats, scheduler snippets):
+[`references/relay-template.md`](./references/relay-template.md). Worked examples,
+including failure drills:
+[`references/relay-scenarios.md`](./references/relay-scenarios.md).
 
 ---
 

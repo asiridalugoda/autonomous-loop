@@ -1,7 +1,8 @@
 # Autonomous-Loop Relay — Multi-Node Extension Design
 
 **Date:** 2026-08-10
-**Status:** Draft v3 — pending user review
+**Status:** Implemented — shipped in v1.4.0 (SKILL.md `## Relay` section,
+`references/relay-template.md`, `references/relay-scenarios.md`)
 **Codename:** `relay` — invoked as **"autonomous-loop relay"**
 **What it is:** an extension to the autonomous-loop skill (this repo) that lets two or
 more Claude Code instances on different machines run the same loop on the same target
