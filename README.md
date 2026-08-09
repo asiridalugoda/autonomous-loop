@@ -16,7 +16,7 @@ work to each other autonomously — no human copy-paste in between.
 > `/autonomous-loop`.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
-&nbsp;·&nbsp; Claude Code skill &nbsp;·&nbsp; v1.4.1
+&nbsp;·&nbsp; Claude Code skill &nbsp;·&nbsp; v1.4.2
 
 ---
 
@@ -248,7 +248,9 @@ node watches with its live session (`/loop`, ~1–2 min round-trips) plus an OS-
 backstop (launchd / Task Scheduler) firing a headless, idempotent watcher every ~5
 minutes — sessions can die, sleep, or reboot and the run continues. Joining a node
 **registers and verifies** that scheduler entry (or records an explicit opt-out) — a
-node isn't watching until the entry provably exists.
+node isn't watching until the entry provably exists. And watchers **die with the
+work**: a pass that finds no open job binding its node removes its own scheduler entry
+and stops polling, so a finished job never leaves orphaned crons behind.
 
 **Relay's own guardrails:** on public repos anyone can comment on your issues — so only
 comments from accounts registered in the node table count as instructions, and

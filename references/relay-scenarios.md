@@ -124,3 +124,12 @@ and verified** (`schtasks /Query` / `launchctl list`), never merely offered. If
 unattended execution is deliberately off — say a TASK is on hold and the user wants no
 accidental claims — the node table records `none (declined)`, and the controller knows
 a TASK sent there waits for a human to open a session.
+
+**The immortal cron.** The job resolves, everyone moves on — and both machines keep
+firing headless watcher passes every 5 minutes against a repo with nothing open,
+forever. Correct behavior: teardown is part of the protocol, symmetric with
+registration. The controller's closure of the last open job includes removing its own
+scheduler entry (`schtasks /Delete` / `launchctl bootout`) and a closing comment; every
+other node's next pass finds no open issue binding it and tears itself down the same
+way, recording `none (torn down <date>)` in the node table. A watcher's lifecycle is
+bound to open jobs — no open jobs, no watchers.

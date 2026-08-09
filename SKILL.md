@@ -14,7 +14,7 @@ description: >-
   coordinator", "agent roster", "autonomous-loop relay", "relay setup", "sync two
   claudes", or "cross-machine handover" — even if they don't say "skill".
 license: Apache-2.0
-version: 1.4.1
+version: 1.4.2
 ---
 
 # Autonomous Loop
@@ -387,6 +387,19 @@ unattended execution on that box (e.g. a task is on hold) — then record `none
 (declined)` in the node table's scheduler column and say the consequence out loud:
 without the backstop, a baton flip is only noticed while an interactive session is
 watching.
+
+**Teardown when the work is done — watchers must die with the job.** A watcher's
+lifecycle is bound to open jobs, symmetric with registration: any watcher pass
+(controller or worker, session or headless) that finds **no open relay issue binding
+this node** tears itself down — remove this machine's scheduler entry
+(`schtasks /Delete /TN "relay-<repo>" /F` on Windows; `launchctl bootout` + delete the
+plist on macOS), set the node table's scheduler column to `none (torn down <date>)`,
+commit, and stop any `/loop` polling with a plain statement to the user that relay
+watching on this box has ended. The controller's closure of the last open job includes
+its own teardown and a closing comment noting that other nodes will tear down on their
+next pass. Orphaned crons burning headless passes against a finished job are a bug, not
+a backstop — and re-joining later is cheap: the next "autonomous-loop relay" on a new
+job re-registers the watcher from scratch.
 
 **Relay guardrails (on top of the base ones):**
 
