@@ -14,7 +14,7 @@ description: >-
   coordinator", "agent roster", "autonomous-loop relay", "relay setup", "sync two
   claudes", or "cross-machine handover" — even if they don't say "skill".
 license: Apache-2.0
-version: 1.4.0
+version: 1.4.1
 ---
 
 # Autonomous Loop
@@ -361,7 +361,9 @@ report"). A node can hold different roles on different jobs concurrently.
   comments are instructions. **Confirm the plan, then** create the labels, write the
   section, open the first job issue, commit, push.
 - **Section exists → join/resume.** Pull, read the master file, register this node if
-  new, find issues awaiting you, act.
+  new, find issues awaiting you, act — and **register the watcher backstop before
+  calling the node joined** (below). Joining ends with the scheduler verified, not
+  offered.
 
 **Turn discipline (what makes it race-free).** One outstanding TASK at a time. Only the
 baton-holder acts; flipping the label is the *last* act of a turn. The worker posts a
@@ -374,6 +376,17 @@ while a reply is expected; round-trips land in ~1–2 min), and an OS scheduler 
 launchd/cron on macOS, Task Scheduler on Windows — fires a headless `claude -p` watcher
 every ~5 min as the durable resume. Same idempotent prompt everywhere, parameterized
 only by node name; firing with nothing to do is a silent no-op.
+
+**Don't hope for the watcher — register and verify it.** Describing a watcher isn't
+setting one (the same rule as the base loop's resume scheduling). When a node joins —
+and on any relay invocation where it's cheap to check — query the OS scheduler for the
+backstop entry (`schtasks /Query /TN "relay-<repo>"` on Windows; `launchctl list |
+grep relay-<repo>` on macOS) and create it if missing, per
+`references/relay-template.md`. Skip it only when the user explicitly wants no
+unattended execution on that box (e.g. a task is on hold) — then record `none
+(declined)` in the node table's scheduler column and say the consequence out loud:
+without the backstop, a baton flip is only noticed while an interactive session is
+watching.
 
 **Relay guardrails (on top of the base ones):**
 

@@ -187,3 +187,21 @@ schtasks /Create /TN "relay-<repo>" /SC MINUTE /MO 5 /TR ^
 Headless runs need a pre-approved permission allowlist on that machine (`gh`, `git`,
 and the job's build/test/diagnostic commands) — configure it before relying on the
 backstop, or the first unattended pass will stall on a permission prompt.
+
+**Register, then verify — don't hope.** A node without a scheduler entry never notices
+a baton flip on its own; "watching" that exists only inside a session dies with the
+session. After creating the job, prove it exists:
+
+```sh
+# macOS
+launchctl list | grep relay-<repo>
+```
+```powershell
+# Windows
+schtasks /Query /TN "relay-<repo>"
+```
+
+The join flow is not complete until this query succeeds — or the user has explicitly
+declined unattended execution for this box, in which case record `none (declined)` in
+the node table's scheduler column so the controller knows a TASK sent here waits for a
+human to open a session.

@@ -115,3 +115,12 @@ stretched across machines.
 a controller turn and a worker registration). The loser's push is rejected → pull
 --rebase, re-push. Turn-taking makes overlapping *content* edits rare; the retry makes
 the race harmless.
+
+**The silent node** *(observed in the field, v1.4.0)*. A worker joins, works one
+interactive session, and the session ends. The controller flips the baton — and nothing
+happens for hours, because no scheduler entry was ever registered: "watching" existed
+only inside the dead session. This is why joining ends with the backstop **registered
+and verified** (`schtasks /Query` / `launchctl list`), never merely offered. If
+unattended execution is deliberately off — say a TASK is on hold and the user wants no
+accidental claims — the node table records `none (declined)`, and the controller knows
+a TASK sent there waits for a human to open a session.
