@@ -14,7 +14,7 @@ description: >-
   coordinator", "agent roster", "autonomous-loop relay", "relay setup", "sync two
   claudes", or "cross-machine handover" — even if they don't say "skill".
 license: Apache-2.0
-version: 1.4.2
+version: 1.5.0
 ---
 
 # Autonomous Loop
@@ -324,6 +324,41 @@ parallelize, or roles distinct enough that a specialized agent + model each beat
 For a handful of goals or a single reviewer, the dispatch-a-subagent flow above is simpler — don't
 stand up a coordinator to check one CRUD change.
 
+## Luna-maxing mode — Codex seats build and review
+
+The loop's own maker/checker flow uses Claude subagents inside one session. Luna-maxing moves
+implementation and review to separate Codex Luna max processes: Claude keeps the plan, ledger,
+gates, git and draft PRs, while Codex seats write, fix and review the task.
+
+One rule is absolute: the orchestrating Claude session never writes product code. The seat split
+is:
+
+| Seat | Responsibility |
+|---|---|
+| Claude orchestrator | plan, rulings, dispatch, gates, git, rebases, ledger, draft PRs |
+| Codex Luna max implementer | implementation, fixes and conflict-resolving rebase jobs |
+| Codex Luna max reviewer | fresh review and scoped re-review |
+
+Hand a goal over when any of these is true:
+
+- it is a dependency-ordered stack of several PRs rather than one loop iteration;
+- it is security-critical or carries migrations;
+- an independent second model's implementation and review are worth the additional cost;
+- the same goal has failed repeatedly and needs a different pair of eyes.
+
+The handoff writes the spec, constraints, task briefs, base commit, worktrees and rulings, then
+dispatches the implementer with `skills/luna-maxing/scripts/dispatch.sh`. The orchestrator runs
+`skills/luna-maxing/scripts/gates.sh` and dispatches a fresh reviewer; findings resume the
+implementer with the fix-round template, and clean tasks become stacked draft PRs. The full seam,
+hand-back protocol and requirements are in `references/luna-maxing.md`.
+
+The bundled skill must be activated before Claude Code will load it. Use the activation step in
+`README.md`, then start a new session; its detailed instructions live in
+`skills/luna-maxing/SKILL.md`.
+
+The mode also requires the `superpowers:subagent-driven-development` skill, the Codex CLI and
+access to `gpt-5.6-luna` at maximum effort.
+
 ## Relay — multi-node mode (codename: `relay`)
 
 Activated when the user says **"autonomous-loop relay"** (or asks to sync/hand over work
@@ -449,6 +484,9 @@ bootstrapping a new project (Step 0) or when you want the exact structure of a s
 Agents **coordinator + roster**: the role→agent roster map, a create-coordinator snippet, thread
 observability + interrupt/archive, and the capability-boundary guardrail. Read it when the harness
 is the Managed Agents API (not one interactive session).
+
+`references/luna-maxing.md` — when the loop hands a goal to Codex seats, how the ledger maps onto
+the spine, and how a stacked draft-PR build returns to the loop.
 
 `references/relay-template.md` — Relay's fill-in scaffolds: the setup-wizard question
 list, the `## Relay` master-file section, issue-body and TASK/RESULT comment templates,
