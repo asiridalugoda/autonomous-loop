@@ -6,7 +6,8 @@ the objective once; the loop decomposes it into verifiable goals and builds them
 with a maker/checker split, keeping all its state on disk so any fresh session can resume
 exactly where it left off. It drives both feature work (test-driven goals) and open-ended
 optimization (metric-driven, keep-or-revert), and it rides through API/usage-limit
-interruptions by scheduling its own resume instead of dying. With **Relay**, two or more
+interruptions by scheduling its own resume instead of dying. With **Luna-maxing**, Codex Luna max
+seats build and review stacked changes while Claude orchestrates. With **Relay**, two or more
 Claude instances on different machines can run the same loop on the same repo and hand
 work to each other autonomously — no human copy-paste in between.
 
@@ -16,7 +17,7 @@ work to each other autonomously — no human copy-paste in between.
 > `/autonomous-loop`.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
-&nbsp;·&nbsp; Claude Code skill &nbsp;·&nbsp; v1.4.2
+&nbsp;·&nbsp; Claude Code skill &nbsp;·&nbsp; v1.5.0
 
 ---
 
@@ -26,6 +27,8 @@ work to each other autonomously — no human copy-paste in between.
   disk, so any fresh session resumes with zero lost context.
 - **Maker ≠ checker** — the agent that implements a goal never grades it; an independent panel
   (plus a red-team + audit on security-critical changes) signs off before it's done.
+- **Luna-maxing handoff** — Codex seats implement and review stacked changes while Claude keeps
+  the plan, gates, ledger, git and draft PRs.
 - **Two goal shapes** — binary spec goals (TDD red→green) *and* metric-driven optimization
   goals (baseline → change in a worktree → keep-or-revert), logged to `EXPERIMENTS.md`.
 - **Interruption-resilient** — a rate/usage-limit hit is a pause, not a failure: the loop
@@ -97,9 +100,30 @@ git clone https://github.com/asiridalugoda/autonomous-loop.git \
 
 Prefer not to clone? Download the ZIP and copy the folder so that
 `~/.claude/skills/autonomous-loop/SKILL.md` exists. The extra files (`README.md`, `LICENSE`)
-are harmless — Claude Code only needs `SKILL.md` and `references/`.
+are harmless — Claude Code only needs `SKILL.md` and
+`references/`.
 
-Restart Claude Code (or start a new session) and it will pick the skill up.
+Restart Claude Code (or start a new session) after completing installation and activation so it
+will pick the skill up.
+
+### Activate the bundled Luna-maxing skill
+
+Claude Code discovers skills one directory below the skills directory. The bundled copy at
+`~/.claude/skills/autonomous-loop/skills/luna-maxing` is inert until it is linked or copied to
+`~/.claude/skills/luna-maxing`:
+
+```sh
+ln -s ~/.claude/skills/autonomous-loop/skills/luna-maxing ~/.claude/skills/luna-maxing
+```
+
+On a filesystem or setup where a symlink is not wanted, copy the skill instead:
+
+```sh
+cp -R ~/.claude/skills/autonomous-loop/skills/luna-maxing ~/.claude/skills/luna-maxing
+```
+
+Luna-maxing additionally needs the `superpowers:subagent-driven-development` skill, the Codex CLI
+and account access to `gpt-5.6-luna`.
 
 **Requires:** Claude Code with skills enabled. The loop leans on Claude Code features —
 subagents for the checker panel, git worktrees for isolated parallel makers, and optionally
@@ -266,6 +290,42 @@ including failure drills:
 
 ---
 
+## Luna-maxing — Codex builds and reviews, Claude orchestrates
+
+Luna-maxing is a tandem build mode for a large, stacked change. Claude holds the plan, rulings,
+ledger, git, gates and draft PRs; Codex Luna max seats implement and review in separate processes.
+The orchestrating session never writes product code.
+
+| Seat | Work |
+|---|---|
+| Claude orchestrator | plan, dispatch, rulings, gates, git, rebases, ledger, draft PRs |
+| Codex Luna max implementer | implementation, fixes and conflict-resolving rebase jobs |
+| Codex Luna max reviewer | fresh review and scoped re-review |
+
+### Per-task loop
+
+1. The orchestrator records the goal slice, constraints, acceptance criteria, base commit and
+   worktree in the plan ledger.
+2. An implementer runs from the task brief and commits locally on its task branch.
+3. The orchestrator runs the repository's gates and sends a fresh reviewer the review package.
+4. Findings become ledger rulings; the implementer resumes for a fix round, then a fresh
+   re-review and gates repeat until clean.
+5. Clean tasks become dependency-ordered draft PRs. The loop keeps `BOARD.md` authoritative while
+   the stack is open and unmerged.
+
+Reach for Luna-maxing when the goal is a stack of several PRs, security-critical or migration
+work, worth the cost of an independent second model, or repeatedly failing under the loop's own
+maker/checker flow. An optimization goal belongs in the loop's baseline and keep-or-revert
+machinery. A project without the Codex CLI or access to `gpt-5.6-luna` cannot use this mode.
+
+It requires Claude Code, the Codex CLI, the `superpowers:subagent-driven-development` skill,
+access to `gpt-5.6-luna` at maximum effort, and a git worktree-capable checkout. Activate the
+bundled skill first; the copy at
+`~/.claude/skills/autonomous-loop/skills/luna-maxing` is inert until it is linked or copied to
+`~/.claude/skills/luna-maxing`. The [handoff reference](./references/luna-maxing.md) describes
+the seam and protocol; the [bundled skill](./skills/luna-maxing/SKILL.md) contains the operating
+instructions.
+
 ## Safety — read this before you let it run
 
 Autonomy multiplies output, including mistakes. This skill has guardrails built in, but you
@@ -279,6 +339,9 @@ own the outcome:
 - **Confirm the irreversible.** Autonomy over *building* is not autonomy over *shipping*.
   Pushing, merging, deploying, and deleting happen only when you've authorized that class of
   action.
+- **Codex seats stay in their worktrees.** Seats are dispatched with full filesystem access
+  (`codex exec -s danger-full-access`) inside their own git worktree, are told never to push, and
+  the orchestrating session — not the seat — runs the gates and owns every push.
 - **No silent caps & a comprehension-debt guard.** Skipped coverage is logged, not hidden;
   every merged goal must be explainable in plain English or it's a stop signal.
 
