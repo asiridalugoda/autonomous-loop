@@ -1,20 +1,20 @@
 ---
 name: autonomous-loop
 description: >-
-  Run an autonomous, self-directed build loop that keeps working across many goals without
-  per-step prompting — design the system that does the work, then let it run (Addy Osmani's
-  "loop engineering"). Use whenever the user wants to "keep going on your own", "run until
-  done", grind through a backlog or goal-list unattended, set up a maker/checker agent
-  workflow, run a self-improving or nightly loop, or build a durable externalized spine
-  (goals + board + handover) so work survives context resets. Also covers Relay — the
-  multi-node mode where two or more Claude instances on different machines run the same
-  loop on the same repo and hand work to each other via GitHub issues. Trigger on phrases
-  like "autonomous loop", "keep working without me", "no human intervention", "loop
-  engineering", "self-improving loop", "run the loop", "ralph loop", "multi-agent
-  coordinator", "agent roster", "autonomous-loop relay", "relay setup", "sync two
-  claudes", or "cross-machine handover" — even if they don't say "skill".
+  Run an autonomous build loop across many goals without per-step prompting
+  (Addy Osmani's "loop engineering"). Use when the user wants to "keep going on your own",
+  "run until done", grind through a backlog unattended, set up a maker/checker workflow, run
+  a self-improving or nightly loop, or keep a durable spine (goals, board, handover) that
+  survives context resets. Also covers Relay (Claude instances on different machines running
+  one loop on one repo, handing work over via GitHub issues) and the Buddy System (an Opus
+  boss directing Codex, Grok, Sonnet and Haiku seats on one build, degrading to Claude-only
+  when providers are limited, one stacked PR per round). Trigger on "autonomous loop",
+  "keep working without me", "no human intervention", "loop engineering", "self-improving
+  loop", "run the loop", "ralph loop", "multi-agent coordinator", "agent roster",
+  "autonomous-loop relay", "sync two claudes", "cross-machine handover", "autonomous-loop
+  buddy system", "buddy system", or "Opus Boss".
 license: Apache-2.0
-version: 1.5.0
+version: 1.6.0
 ---
 
 # Autonomous Loop
@@ -453,6 +453,78 @@ Templates (the `## Relay` section, wizard question list, TASK/RESULT comments, w
 prompt, launchd/schtasks snippets): `references/relay-template.md`. Worked end-to-end
 examples including failure drills: `references/relay-scenarios.md`.
 
+## Buddy System — multi-provider build mode (codename: `buddy`)
+
+Activated when the user says **"autonomous-loop buddy system"** (or "buddy system", "Opus
+Boss"), optionally with flags. It runs this same loop with its roles spread across model
+providers, so a round builds many lanes at once and no lane is checked by the provider that
+built it while another provider is available. **Read `references/buddy-system.md` before the first round** — it holds the
+roster, the commands, the gates and the profile template; the seat scripts and brief
+templates are in `buddy-system/`.
+
+**The seats.** The Opus session running the loop is the **Boss**: rulings, briefs, local
+merges, gates, disk floor, git. **Astra** (Codex) proposes each round's lanes, contracts,
+risks and test plan. Two build sides run in parallel: **Sonnet** leads with a **Haiku** swarm
+on exact-change satellites, and **Sol** (Codex) orchestrating **Luna** builders on lanes
+whose contracts are settled. **Grok** reviews lanes and runs the security round; **Sol** is
+the merge reviewer when Codex built nothing; **Luna** re-reviews Claude-built fixes.
+
+**Maker ≠ checker, across providers.** A Claude-built lane is reviewed by Grok (or Sol); a
+Codex-built lane by Grok, never Sol or Luna; a Grok-built lane by Sol. The merge review comes
+from a provider that built none of the round. When no other provider is available, the Opus
+subagent fallbacks keep it as a different model: Opus checks only Sonnet and Haiku work.
+
+**Provider modes degrade automatically.** `bash buddy-system/scripts/providers.sh` runs at
+session start, every round, whenever a Grok or Codex seat exits 75 (its limit), and whenever Sol's wave
+report starts with `LIMIT: codex`. It picks
+FULL, NO-CODEX, NO-GROK or CLAUDE-ONLY, and each seat moves to that mode's column without
+asking or waiting for a reset. A provider limit is a mode change, never a pause or a strike.
+A `--mode claude-only` run never probes and never contacts another provider.
+
+**Invocation is state-first:**
+
+- **No spine** → Step 0 first; the buddy system builds goals from `GOALS.md`.
+- **No `## Buddy System` section in `docs/loop/LOOP.md`** → setup wizard: detect the
+  toolchain, gates, identity and providers; ask for the commit identity, push authority, gate,
+  copy rules and security-critical areas; confirm, write the section, commit. The project
+  profile lives **in the target repo**, never in this skill.
+- **Section exists → resume** from the profile, `handover.md` and BOARD's `## Buddy rounds`
+  table (run flags, round, mode, each lane's builder, head SHA and verdicts, PR). Seats from a
+  dead session are re-dispatched fresh from their briefs in `.claude/buddy/round-<n>/`.
+
+**A push round is the unit of work** — it replaces steps 2–7 for a batch of goals:
+architecture → briefs as files → parallel dispatch on disjoint files → merge and re-gate per
+lane → lane reviews, security round, fix rounds → Boss gate on the integrated head → merge
+review → **one stacked PR per round**, never waiting for a merge to start the next. The stack
+merges at the end, on the user's word only.
+
+**Flags** (they compose, except `--local` with `relay`). The active flags are recorded on
+BOARD and honored by every resume; a resume never widens provider access or push authority
+on its own.
+
+| Flag | Effect |
+|---|---|
+| `--mode <full\|no-codex\|no-grok\|claude-only>` | Pin a mode ceiling; `claude-only` skips the probe, needs no external CLI and sends no code to another provider |
+| `--local` | Build, review and gate locally on `buddy/round-<n>` branches; push nothing, open no PR or issue |
+| `--rounds <n>` | Stop after `n` rounds (the bounded batch for a scheduled run) |
+| `--plan <path>` | Build this implementation plan; its rows become goals |
+| `relay` | Compose with Relay: the Boss is the controller; gates that must run on another machine go to a worker as TASKs |
+
+**Buddy guardrails (on top of the base ones):**
+
+- **Nothing a seat claims counts** until the Boss re-runs the gates on the integrated head.
+  Integration runs report pass and skip counts; a selection that skipped is vacuous.
+- **Seats run only through the scripts** (`grok-seat.sh`, `codex-seat.sh`), which set each
+  role's sandbox, strip cloud credentials and enforce the disk floor. The Codex build side
+  runs with full access inside standalone clones; pin `--mode no-codex` where that is not
+  acceptable.
+- **Seats commit only through `commit.sh`** with the profile's identity and no trailers;
+  `gate-common.sh` checks authors, trailers and the copy ratchet on every round.
+- **Every regression test is shown red for the right reason, then green.** Security-critical
+  rounds get the security round and an audit artifact in `audits/`.
+- **Push authority is the user's**, recorded in the profile (or withheld with `--local`).
+  Merging and deploying are never part of a round.
+
 ## Evolving the runbook (guarded self-revision)
 
 The loop can improve its own *method*, not just the product — autoresearch's `program.md` is
@@ -496,6 +568,14 @@ when the user invokes "autonomous-loop relay".
 `references/relay-scenarios.md` — worked Relay examples end to end: environment fix
 (mac→win), code-fix branch handover, same-OS pairing, and failure drills (duplicate
 watchers, injection attempts on public issues, session death, push races).
+
+`references/buddy-system.md` — the Buddy System runbook: requirements, flags, the setup
+wizard and the `## Buddy System` profile section, how a round maps onto the spine, the
+roster and provider modes, one canonical command per seat, the round sequence, gates, disk
+floor, lane rules, composition with the other modes, and common mistakes. Read it when the
+user invokes "autonomous-loop buddy system". Its tools live in `buddy-system/`: `scripts/`
+(provider probe, Grok and Codex seat runners, workspaces, commit and gate checks) and
+`templates/` (the brief for every seat).
 
 A proven real-world instance of this system lives in the Hardhat project under `docs/loop/`
 — useful to look at for a worked example of the spine files fully populated.

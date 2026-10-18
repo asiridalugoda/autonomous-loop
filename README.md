@@ -9,7 +9,9 @@ optimization (metric-driven, keep-or-revert), and it rides through API/usage-lim
 interruptions by scheduling its own resume instead of dying. With **Luna-maxing**, Codex Luna max
 seats build and review stacked changes while Claude orchestrates. With **Relay**, two or more
 Claude instances on different machines can run the same loop on the same repo and hand
-work to each other autonomously — no human copy-paste in between.
+work to each other autonomously — no human copy-paste in between. With the **Buddy System**,
+one Opus session directs a build across several model providers — Codex and Grok alongside
+Sonnet and Haiku — so no lane is checked by the provider that built it.
 
 > **Trigger it** with phrases like *"keep working without me"*, *"run the loop"*,
 > *"grind through this backlog unattended"*, *"self-improving loop"*, or *"autonomous loop"* —
@@ -17,7 +19,7 @@ work to each other autonomously — no human copy-paste in between.
 > `/autonomous-loop`.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
-&nbsp;·&nbsp; Claude Code skill &nbsp;·&nbsp; v1.5.0
+&nbsp;·&nbsp; Claude Code skill &nbsp;·&nbsp; v1.6.0
 
 ---
 
@@ -43,6 +45,10 @@ work to each other autonomously — no human copy-paste in between.
 - **Relay (multi-node)** — say *"autonomous-loop relay"* and instances on different machines
   (mac↔win, mac↔mac, win↔win) coordinate through the repo's own GitHub issues: a
   controller directs, a worker executes on its box, labels pass the baton.
+- **Buddy System (multi-provider)** — say *"autonomous-loop buddy system"* and an Opus Boss
+  runs each round across providers: Codex architects and builds, Grok reviews and attacks,
+  Sonnet and Haiku build, and the mode degrades on its own to Claude-only seats when a
+  provider hits its limit. One stacked PR per round.
 
 ---
 
@@ -100,8 +106,8 @@ git clone https://github.com/asiridalugoda/autonomous-loop.git \
 
 Prefer not to clone? Download the ZIP and copy the folder so that
 `~/.claude/skills/autonomous-loop/SKILL.md` exists. The extra files (`README.md`, `LICENSE`)
-are harmless — Claude Code only needs `SKILL.md` and
-`references/`.
+are harmless — Claude Code only needs `SKILL.md`, `references/` and (for the Buddy System)
+`buddy-system/`.
 
 Restart Claude Code (or start a new session) after completing installation and activation so it
 will pick the skill up.
@@ -127,7 +133,8 @@ and account access to `gpt-5.6-luna`.
 
 **Requires:** Claude Code with skills enabled. The loop leans on Claude Code features —
 subagents for the checker panel, git worktrees for isolated parallel makers, and optionally
-Workflow scripts / scheduled wake-ups for unattended runs.
+Workflow scripts / scheduled wake-ups for unattended runs. The Buddy System can optionally
+use the Grok CLI and the Codex CLI; without them it runs with Claude seats only.
 
 ---
 
@@ -325,6 +332,114 @@ bundled skill first; the copy at
 `~/.claude/skills/luna-maxing`. The [handoff reference](./references/luna-maxing.md) describes
 the seam and protocol; the [bundled skill](./skills/luna-maxing/SKILL.md) contains the operating
 instructions.
+
+---
+
+## Buddy System — one Boss, many providers
+
+The base loop already splits the maker from the checker. The Buddy System goes a step
+further: **the checker comes from a different model provider than the maker**, and many
+lanes build at once. One Opus session is the **Boss**; every other seat executes a written
+brief and reports back, and nothing a seat claims counts until the Boss re-runs the gates on
+the integrated head.
+
+**Start it** — in a repo with (or about to get) a loop spine, say:
+
+```
+autonomous-loop buddy system
+```
+
+First run: a short wizard detects your toolchain, test commands, git identity and which
+providers are installed, asks for the commit identity, push authority, gate and the areas
+that need a security round — then writes a `## Buddy System` profile section into
+`docs/loop/LOOP.md`. Every later run reads that profile and resumes from the round recorded
+on `BOARD.md`. Project-specific settings live in your repo, never in the skill.
+
+### The seats
+
+| Seat | Model | Job |
+|---|---|---|
+| **Boss** | Claude Opus (this session) | rulings, briefs, local merges, gates, disk floor, git, the PR |
+| **Architect** | Astra (`gpt-6-astra`, Codex) | lanes with disjoint files, contracts, risks, test plan per round |
+| **Builders (Claude side)** | Sonnet lead + Haiku swarm | Sonnet builds the judgement-heavy core; Haikus do exact-change satellites in parallel |
+| **Builders (Codex side)** | Sol orchestrating Luna (`gpt-6-luna`) | whole lanes with settled contracts — backend logic, written-schema migrations, test-heavy work |
+| **Lane reviewer + security tester** | Grok (`grok-4.7`) | GO/NO-GO per lane; abuse tests in a scratch clone for security-relevant rounds |
+| **Merge reviewer** | Sol (`gpt-6.1-sol`) | the whole round's diff and PR body, when Codex built nothing that round |
+| **Re-reviewer** | Luna | fast scoped re-checks of Claude-built fixes |
+
+**Maker ≠ checker, across providers:** a Claude-built lane is reviewed by Grok (or Sol), a
+Codex-built lane by Grok — never by Sol or Luna — and a Grok-built lane by Sol.
+
+### Provider modes — degrade, don't wait
+
+A provider probe runs at the start of every round and whenever a Grok or Codex seat hits its
+limit. The build keeps going in whatever mode is available, and upgrades again when the
+provider is back:
+
+| Mode | When | What changes |
+|---|---|---|
+| `FULL` | Grok and Codex both available | the full roster above |
+| `NO-CODEX` | Codex limited or missing | Opus subagent architects; Grok reviews everything; no Codex builders |
+| `NO-GROK` | Grok limited or missing | Sol reviews Claude-built lanes; Opus subagents review Codex-built lanes and run the security round |
+| `CLAUDE-ONLY` | neither available (or pinned) | Sonnet and Haiku build; Opus subagents architect, review and attack |
+
+### One round
+
+```
+round 3  mode=FULL  base=round-2 PR head
+──────────────────────────────────────────────────────────────
+Astra  → lanes A (auth guard), B (billing export), C (docs + flags); contracts
+Boss   → rulings; contracts committed as the round's baseline; briefs written
+build  → Sonnet: lane A core   · Haiku ×3: lane A/C satellites
+         Sol → Luna: lane B (own clone)                         (all in parallel)
+Boss   → merge each lane --no-ff, re-gate after every merge
+review → Grok: A GO · B NO-GO (1 finding) · C GO
+         Grok security round on A → PASS (attack tests adopted as guards)
+fix    → lane B back to Sol → Luna; Grok re-review → GO
+verify → Boss gate on the integrated head: build, lint, unit, every CI
+         integration pattern with pass/skip counts, authors, trailers, ratchet
+merge  → Grok merge review (Codex built lane B) → APPROVE
+push   → PR #57, based on round 2's PR #54; BOARD + handover updated → round 4
+```
+
+Rounds stack: each PR is based on the previous round's branch, so building never waits for a
+merge. The stack is merged together at the end — **only on your word**.
+
+### Flags
+
+Flags compose: `autonomous-loop buddy system --local --rounds 2 --mode claude-only` (all but
+`--local` with `relay`, which needs pushes). The active flags are written to `BOARD.md`, so a
+resumed or scheduled session keeps them: a `claude-only` run never quietly becomes `FULL`.
+
+| Flag | Effect |
+|---|---|
+| `--mode <full\|no-codex\|no-grok\|claude-only>` | Pin a mode ceiling. `claude-only` skips the provider probe, needs no external CLI and sends no code to another provider. |
+| `--local` | Build, review and gate locally on `buddy/round-<n>` branches; push nothing, open no PR or issue. |
+| `--rounds <n>` | Stop after `n` rounds — the bounded batch for a scheduled or overnight run. |
+| `--plan <path>` | Build an existing implementation plan; its rows become goals in `GOALS.md`. |
+| `relay` | Combine with Relay: the Boss is the controller, and gates that must run on another machine (a Windows build, attached hardware) go to a worker node as relay TASKs. |
+
+### Requirements and cautions
+
+- **Required:** Claude Code with subagents and worktrees, `git`, and an authenticated `gh` for
+  stacked PRs.
+- **Optional:** the [Grok CLI](https://x.ai) and the [Codex CLI](https://github.com/openai/codex).
+  Missing or rate-limited providers just change the mode.
+- **Sending code to other providers.** In any mode but `CLAUDE-ONLY`, your code is read by
+  xAI and OpenAI models. Pin `--mode claude-only` for code that must not leave Anthropic.
+- **The Codex build side runs with full access** inside standalone clones, with cloud
+  credentials stripped and briefs that forbid push, PRs and remote calls. If that is not
+  acceptable on your machine, pin `--mode no-codex`.
+- **Every seat runs through a wrapper** that sets its sandbox and refuses to start below the
+  disk floor (10 GB by default); seats commit only through `commit.sh`, with your identity
+  and no trailers.
+
+Full runbook — roster, commands, gates, the profile template, and how it composes with Relay,
+optimization goals and scheduled runs:
+[`references/buddy-system.md`](./references/buddy-system.md). Seat scripts and brief
+templates: [`buddy-system/`](./buddy-system/).
+
+---
 
 ## Safety — read this before you let it run
 
